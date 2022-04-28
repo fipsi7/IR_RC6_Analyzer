@@ -4,8 +4,8 @@
 #include <AnalyzerHelpers.h>
 
 RC6SimulationDataGenerator::RC6SimulationDataGenerator()
-:	mSerialText( "My first analyzer, woo hoo!" ),
-	mStringIndex( 0 )
+:	mAddress( 0xFF ),
+	mData( 0xFF )
 {
 }
 
@@ -20,7 +20,7 @@ void RC6SimulationDataGenerator::Initialize( U32 simulation_sample_rate, RC6Anal
 
 	mSerialSimulationData.SetChannel( mSettings->mInputChannel );
 	mSerialSimulationData.SetSampleRate( simulation_sample_rate );
-	mSerialSimulationData.SetInitialBitState( BIT_HIGH );
+	mSerialSimulationData.SetInitialBitState( BIT_LOW );
 }
 
 U32 RC6SimulationDataGenerator::GenerateSimulationData( U64 largest_sample_requested, U32 sample_rate, SimulationChannelDescriptor** simulation_channel )
@@ -38,34 +38,82 @@ U32 RC6SimulationDataGenerator::GenerateSimulationData( U64 largest_sample_reque
 
 void RC6SimulationDataGenerator::CreateSerialByte()
 {
-	U32 samples_per_bit = mSimulationSampleRateHz / mSettings->mBitRate;
+	U32 samples_per_bit = mSimulationSampleRateHz / (mSettings->mCarrierFrequency/16); //Bit Frequency 16 times slower as the carrier frequency
 
-	U8 byte = mSerialText[ mStringIndex ];
-	mStringIndex++;
-	if( mStringIndex == mSerialText.size() )
-		mStringIndex = 0;
-
-	//we're currenty high
 	//let's move forward a little
 	mSerialSimulationData.Advance( samples_per_bit * 10 );
 
-	mSerialSimulationData.Transition();  //low-going edge for start bit
-	mSerialSimulationData.Advance( samples_per_bit );  //add start bit time
+	//start symbol
+	mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
+	mSerialSimulationData.Advance( samples_per_bit * 6 );
+	mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+	mSerialSimulationData.Advance( samples_per_bit * 2 );
 
+	//first bit
+	mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
+	mSerialSimulationData.Advance( samples_per_bit );
+	mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+	mSerialSimulationData.Advance( samples_per_bit );
+
+	//Mode Bits - Mode 0
+	mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+	mSerialSimulationData.Advance( samples_per_bit );
+	mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
+	mSerialSimulationData.Advance( samples_per_bit );
+	mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+	mSerialSimulationData.Advance( samples_per_bit );
+	mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
+	mSerialSimulationData.Advance( samples_per_bit );
+	mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+	mSerialSimulationData.Advance( samples_per_bit );
+	mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
+	mSerialSimulationData.Advance( samples_per_bit );
+
+	//TOGGLE - TODO
+	mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+	mSerialSimulationData.Advance( samples_per_bit * 2);
+	mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
+	mSerialSimulationData.Advance( samples_per_bit * 2);
+
+	
+	// ADDRESS
 	U8 mask = 0x1 << 7;
 	for( U32 i=0; i<8; i++ )
 	{
-		if( ( byte & mask ) != 0 )
+		if( ( mAddress & mask ) != 0 ){
 			mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
-		else
+			mSerialSimulationData.Advance( samples_per_bit );
 			mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+		} else{
+			mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+			mSerialSimulationData.Advance( samples_per_bit );
+			mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
+		}
 
 		mSerialSimulationData.Advance( samples_per_bit );
 		mask = mask >> 1;
 	}
 
-	mSerialSimulationData.TransitionIfNeeded( BIT_HIGH ); //we need to end high
+	// DATA
+	mask = 0x1 << 7;
+	for( U32 i=0; i<8; i++ )
+	{
+		if( ( mData & mask ) != 0 ){
+			mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
+			mSerialSimulationData.Advance( samples_per_bit );
+			mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+		} else{
+			mSerialSimulationData.TransitionIfNeeded( BIT_LOW );
+			mSerialSimulationData.Advance( samples_per_bit );
+			mSerialSimulationData.TransitionIfNeeded( BIT_HIGH );
+		}
+
+		mSerialSimulationData.Advance( samples_per_bit );
+		mask = mask >> 1;
+	}
+
+	mSerialSimulationData.TransitionIfNeeded( BIT_LOW ); //we need to end low
 
 	//lets pad the end a bit for the stop bit:
-	mSerialSimulationData.Advance( samples_per_bit );
+	mSerialSimulationData.Advance( samples_per_bit * 10);
 }

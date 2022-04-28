@@ -17,11 +17,11 @@ public:
 
 	
 	Channel mInputChannel;
-	U32 mBitRate;
+	U32 mCarrierFrequency;
 
 protected:
 	std::auto_ptr< AnalyzerSettingInterfaceChannel >	mInputChannelInterface;
-	std::auto_ptr< AnalyzerSettingInterfaceInteger >	mBitRateInterface;
+	std::auto_ptr< AnalyzerSettingInterfaceInteger >	mCarrierFrequencyInterface;
 };
 
 #endif //RC6_ANALYZER_SETTINGS

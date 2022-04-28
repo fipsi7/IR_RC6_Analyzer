@@ -4,20 +4,20 @@
 
 RC6AnalyzerSettings::RC6AnalyzerSettings()
 :	mInputChannel( UNDEFINED_CHANNEL ),
-	mBitRate( 9600 )
+	mCarrierFrequency( 36000 )
 {
 	mInputChannelInterface.reset( new AnalyzerSettingInterfaceChannel() );
-	mInputChannelInterface->SetTitleAndTooltip( "Serial", "Standard Vogt's IR RC6 Analyzer " );
+	mInputChannelInterface->SetTitleAndTooltip( "IR Pin", "Standard Vogt's IR RC6 Analyzer " );
 	mInputChannelInterface->SetChannel( mInputChannel );
 
-	mBitRateInterface.reset( new AnalyzerSettingInterfaceInteger() );
-	mBitRateInterface->SetTitleAndTooltip( "Bit Rate (Bits/S)",  "Specify the bit rate in bits per second." );
-	mBitRateInterface->SetMax( 6000000 );
-	mBitRateInterface->SetMin( 1 );
-	mBitRateInterface->SetInteger( mBitRate );
+	mCarrierFrequencyInterface.reset( new AnalyzerSettingInterfaceInteger() );
+	mCarrierFrequencyInterface->SetTitleAndTooltip( "Carrier Frequency (Hz)",  "Specify thecarrier frequency in Hz." );
+	mCarrierFrequencyInterface->SetMax( 6000000 );
+	mCarrierFrequencyInterface->SetMin( 1 );
+	mCarrierFrequencyInterface->SetInteger( mCarrierFrequency );
 
 	AddInterface( mInputChannelInterface.get() );
-	AddInterface( mBitRateInterface.get() );
+	AddInterface( mCarrierFrequencyInterface.get() );
 
 	AddExportOption( 0, "Export as text/csv file" );
 	AddExportExtension( 0, "text", "txt" );
@@ -34,7 +34,7 @@ RC6AnalyzerSettings::~RC6AnalyzerSettings()
 bool RC6AnalyzerSettings::SetSettingsFromInterfaces()
 {
 	mInputChannel = mInputChannelInterface->GetChannel();
-	mBitRate = mBitRateInterface->GetInteger();
+	mCarrierFrequency = mCarrierFrequencyInterface->GetInteger();
 
 	ClearChannels();
 	AddChannel( mInputChannel, "Vogt's IR RC6 Analyzer ", true );
@@ -45,7 +45,7 @@ bool RC6AnalyzerSettings::SetSettingsFromInterfaces()
 void RC6AnalyzerSettings::UpdateInterfacesFromSettings()
 {
 	mInputChannelInterface->SetChannel( mInputChannel );
-	mBitRateInterface->SetInteger( mBitRate );
+	mCarrierFrequencyInterface->SetInteger( mCarrierFrequency );
 }
 
 void RC6AnalyzerSettings::LoadSettings( const char* settings )
@@ -54,7 +54,7 @@ void RC6AnalyzerSettings::LoadSettings( const char* settings )
 	text_archive.SetString( settings );
 
 	text_archive >> mInputChannel;
-	text_archive >> mBitRate;
+	text_archive >> mCarrierFrequency;
 
 	ClearChannels();
 	AddChannel( mInputChannel, "Vogt's IR RC6 Analyzer ", true );
@@ -67,7 +67,7 @@ const char* RC6AnalyzerSettings::SaveSettings()
 	SimpleArchive text_archive;
 
 	text_archive << mInputChannel;
-	text_archive << mBitRate;
+	text_archive << mCarrierFrequency;
 
 	return SetReturnString( text_archive.GetString() );
 }

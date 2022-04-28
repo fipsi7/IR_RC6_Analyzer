@@ -23,7 +23,21 @@ void RC6AnalyzerResults::GenerateBubbleText( U64 frame_index, Channel& channel, 
 
 	char number_str[128];
 	AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 8, number_str, 128 );
-	AddResultString( number_str );
+	if(frame.HasFlag(1)){
+		AddResultString( "LEADING PREAMBLE" );
+	}else if(frame.HasFlag(2)){
+		AddResultString( "ONE BIT" );
+	}else if(frame.HasFlag(4)){
+		AddResultString( "Mode:" , number_str );
+	}else if(frame.HasFlag(8)){
+		AddResultString( "Toggle:" , number_str );
+	}else if(frame.HasFlag(16)){
+		AddResultString( "Address:" , number_str );
+	}else if(frame.HasFlag(32)){
+		AddResultString( "Data:" , number_str );
+	}else{
+		AddResultString( number_str );
+	}
 }
 
 void RC6AnalyzerResults::GenerateExportFile( const char* file, DisplayBase display_base, U32 export_type_user_id )
@@ -66,7 +80,21 @@ void RC6AnalyzerResults::GenerateFrameTabularText( U64 frame_index, DisplayBase 
 
 	char number_str[128];
 	AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 8, number_str, 128 );
-	AddTabularText( number_str );
+	if(frame.HasFlag(1)){
+		AddTabularText( "LEADING PREAMBLE" );
+	}else if(frame.HasFlag(2)){
+		AddTabularText( "ONE BIT" );
+	}else if(frame.HasFlag(4)){
+		AddTabularText( "Mode:" , number_str );
+	}else if(frame.HasFlag(8)){
+		AddTabularText( "Toggle:" , number_str );
+	}else if(frame.HasFlag(16)){
+		AddTabularText( "Address:" , number_str );
+	}else if(frame.HasFlag(32)){
+		AddTabularText( "Data:" , number_str );
+	}else{
+		AddTabularText( number_str );
+	}
 #endif
 }
 
