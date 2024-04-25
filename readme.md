@@ -2,7 +2,8 @@
 
 - [Saleae Analyzer SDK Sample Analyzer](#saleae-analyzer-sdk-sample-analyzer)
   - [Renaming your Analyzer](#renaming-your-analyzer)
-  - [Cloud Building & Publishing](#cloud-building---publishing)
+  - [Cloud Building & Publishing](#cloud-building--publishing)
+    - [Apple Silicon Support](#apple-silicon-support)
   - [Prerequisites](#prerequisites)
     - [Windows](#windows)
     - [MacOS](#macos)
@@ -87,6 +88,37 @@ xattr -r -d com.apple.quarantine libSimpleSerialAnalyzer.so
 
 To verify the flag was removed, run the first command again and verify the quarantine flag is no longer present.
 
+### Apple Silicon Support
+
+Logic 2 now supports Apple Silicon natively!
+
+The included Github Actions integration, documented [here](#cloud-building---publishing), will automatically build your analyzer for both x86_64 and arm64 architectures, for MacOS.
+
+When you build your custom analyzer on a Mac, by default it will compile for the architecture of the system.
+
+Unfortunately, universal binaries are not currently supported.
+
+You can optionally cross build your analyzer using an x86_64 host system targeting arm64, or from a arm64 host system targeting x86_64.
+
+To cross build, you will need to create a new build directory (for example `build/x86_64` or `build/arm64`). Then use the CMake variable [CMAKE_OSX_ARCHITECTURES](https://cmake.org/cmake/help/latest/variable/CMAKE_OSX_ARCHITECTURES.html).
+
+Examples:
+
+```bash
+mkdir -p build/arm64
+cd build/arm64
+cmake -DCMAKE_OSX_ARCHITECTURES=arm64 ../..
+cmake --build .
+cd ../..
+# built analyzer will be located at SampleAnalyzer/build/arm64/Analyzers/libSimpleSerialAnalyzer.so
+mkdir -p build/x86_64
+cd build/x86_64
+cmake -DCMAKE_OSX_ARCHITECTURES=x86_64 ../..
+cmake --build .
+cd ../..
+# built analyzer will be located at SampleAnalyzer/build/x86_64/Analyzers/libSimpleSerialAnalyzer.so
+```
+
 ## Prerequisites
 
 ### Windows
@@ -95,6 +127,7 @@ Dependencies:
 
 - Visual Studio 2017 (or newer) with C++
 - CMake 3.13+
+- git
 
 **Visual Studio 2017**
 
@@ -111,12 +144,17 @@ Note - if CMake has any problems with the MSVC compiler, it's likely a component
 Download and install the latest CMake release here.
 https://cmake.org/download/
 
+**git**
+
+Git is required for CMake to automatically download the AnalyzerSDK, which is a dependency of this project. Git can be downloaded here: https://git-scm.com/
+
 ### MacOS
 
 Dependencies:
 
 - XCode with command line tools
 - CMake 3.13+
+- git
 
 Installing command line tools after XCode is installed:
 
@@ -144,6 +182,7 @@ Dependencies:
 
 - CMake 3.13+
 - gcc 5+
+- git
 
 Misc dependencies:
 
@@ -191,7 +230,9 @@ First, build your analyzer. Then, in the Logic 2 software, load your custom anal
 
 Once restarted, the software should show your custom analyzer in the list of available analyzers.
 
-Next, in order to attach your debugger, you will need to find the process ID of the Logic 2 software. To make this easy, we display the process ID of the correct process in the About dialog in the software, which you can open from the main menu. It's the last item in the "Build Info" box, labeled "PID". Note that this is not the correct PID when using an ARM based M1 Mac. (Please contact support for details on debugging on M1 Macs.)
+Next, in order to attach your debugger, you will need to find the process ID of the Logic 2 software. To make this easy, we display the process ID of the correct process in the About dialog in the software, which you can open from the main menu. It's the last item in the "Build Info" box, labeled "PID". (Note, if you are using MacOS and you see "Architecture: x64 (Translated)" in the about dialog, this PID won't work. Contact support for details.)
+
+![PID shown in about dialog](./docs/pid.png)
 
 You will need that PID number for the platform specific steps below.
 
@@ -203,9 +244,11 @@ when `cmake .. -A x64` was run, a Visual Studio solution file was created automa
 
 Then, open the Debug menu, and select "attach to process...".
 
-Enter the PID number into the Filter box to find the correct instance of Logic.exe.
+In the "Attach to:" selection box, ensure that "Native code" is selected. This is usually selected by default. If not, you will need to select it manually by clicking the "Select..." button to the right. After clicking "Select...", a new window will appear like shown below. Select "Native code" from there.
 
-Click attach.
+![Screenshot 2023-03-03 at 6 14 46 PM](https://user-images.githubusercontent.com/27969866/222858530-3e0b1a6c-a615-425e-a361-7f2a3c531b92.png)
+
+Afterwards, enter the PID number into the Filter box to find the correct instance of Logic.exe. Click attach.
 
 Next, place a breakpoint somewhere in your analyzer source code. For example, the start of the WorkerThread function.
 
@@ -213,7 +256,13 @@ Make sure you already have recorded data in the application, and then add an ins
 
 ### MacOS
 
-We don't have a clear process for how to debug custom protocol analyzers on MacOS. If you attempt to attach a debugger to the Logic 2 software, you will likely see an error like this:
+On MacOS, you can debug your custom analyzer using lldb.
+
+However, before you can attach a debugger to the Logic 2 process on MacOS, you will need to add an additional [entitlement](https://developer.apple.com/documentation/bundleresources/entitlements) to the Logic 2 app packages.
+
+This is because in order to distribute applications for MacOS, these applications must be [signed and notarized](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution). One requirement for notarization is that debugging support is disabled.
+
+If you attempt to attach a debugger to the Logic 2 process without adding an additional entitlement manually, you will see an error like this:
 
 > error: attach failed: attach failed (Not allowed to attach to process. Look in the console messages (Console.app), near the debugserver entries, when the attach failed. The subsystem that denied the attach permission will likely have logged an informative message about why it was denied.)
 
@@ -221,7 +270,34 @@ Checking the output in Console.app, you will likely find logs like this:
 
 > macOSTaskPolicy: (com.apple.debugserver) may not get the task control port of (Logic2 Helper (R) (pid: 95234): (Logic2 Helper (R) is hardened, (Logic2 Helper (R) doesn't have get-task-allow, (com.apple.debugserver) is a declared debugger(com.apple.debugserver) is not a declared read-only debugger
 
-This is likely due to our signing and notarization process on MacOS not adding the `get-task-allow` entitlement. If you're in need of MacOS debugging, please contact Saleae support to request it.
+To fix this, you will need to add the [get-task-allow](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_security_cs_debugger) entitlement to all of the Logic 2 app packages.
+
+You can use this 3rd party convenience script with the instructions below to add the entitlements. This process needs to be completed once per computer, and will need to be repeated after updating Logic 2.
+
+[https://gist.github.com/talaviram/1f21e141a137744c89e81b58f73e23c3](https://gist.github.com/talaviram/1f21e141a137744c89e81b58f73e23c3)
+
+Review and download that script, then add execution permissions from the terminal with `chmod +x add_debug_entitlement.sh`
+
+Then run that script on the Logic 2 app directory, as well as the various included electron helper app packages:
+
+```bash
+./add_debug_entitlement.sh /Applications/Logic2.app
+./add_debug_entitlement.sh /Applications/Logic2.app/Contents/Frameworks/Logic2\ Helper\ \(GPU\).app
+./add_debug_entitlement.sh /Applications/Logic2.app/Contents/Frameworks/Logic2\ Helper.app
+./add_debug_entitlement.sh /Applications/Logic2.app/Contents/Frameworks/Logic2\ Helper\ \(Plugin\).app
+./add_debug_entitlement.sh /Applications/Logic2.app/Contents/Frameworks/Logic2\ Helper\ \(Renderer\).app
+```
+
+Now you're all set! To debug with command line lldb, simply launch the Logic 2 software and check the PID as explained above. Then run this from the terminal:
+
+```bash
+lldb
+attach <pid>
+```
+
+Please see the Linux instructions below for more gdb command examples, which _mostly_ translate to lldb 1:1.
+
+Once complete, you should also be able to attach other debugger GUIs like xcode or CLion to Logic 2 using the same PID.
 
 ### Linux
 
